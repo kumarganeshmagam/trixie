@@ -1,0 +1,61 @@
+Description:
+We are developing a tool to automate the generation of project structures for various programming languages and frameworks. This tool will streamline the process of setting up new projects by providing a customizable template that adheres to best practices and common conventions.
+
+Instructions:
+Please generate a project structure for the following types of projects:
+
+1. Java Project:
+   - Project Name: [ProjectName]
+   - Location: [Location]
+   - Maven Integration: [Yes/No]
+   - Spring Boot Integration: [Yes/No]
+
+   Example Java Project Structure:
+[ProjectName]
+├── src
+│ └── main
+│     └── java
+│         └── com
+│             └── example
+│                 └── Main.java
+└── pom.xml (if Maven integration is selected)
+
+2. Node.js Project:
+- Project Name: [ProjectName]
+- Location: [Location]
+- React.js Integration: [Yes/No]
+
+Example Node.js Project Structure:
+[ProjectName]
+├── index.js
+└── package.json (with necessary dependencies)
+├── src (if React.js integration is selected)
+│ └── App.js
+
+3. Python Project:
+- Project Name: [ProjectName]
+- Location: [Location]
+
+Example Python Project Structure:
+[ProjectName]
+└── main.py
+
+Criteria:
+- Generate complete code contents for each task according to the specified requirements.
+- Ensure that the generated code is well-organized, readable, and easy to understand.
+- Include necessary setup files (e.g., pom.xml for Java projects, package.json for Node.js projects, requirements.txt for Python projects).
+- If optional features are selected (e.g., Spring Boot for Java projects, React.js for Node.js projects), include appropriate configurations and additional files.
+- The generated project structure should follow standard conventions for the respective language and framework.
+- Include necessary setup files (e.g., pom.xml for Java projects, package.json for Node.js projects).
+- If optional features are selected (e.g., Spring Boot for Java, React.js for Node.js), include appropriate configurations.
+- Ensure that the generated code is well-organized, readable, and easy to understand.
+
+Additional Notes:
+- Feel free to include any additional setup or configuration that you believe would be beneficial for each project type.
+- We aim for consistency and efficiency in project setup across different languages and frameworks.
+
+Thank you for your assistance!
+
+---
+
+User Input: [UserInput]

@@ -1,0 +1,4 @@
+1. Add a feature to get complete response from wiki and make ai ans the question based on that result
+2. Add the feature to make application give response without keywords
+3. Add feature to make the projects using user command / prompt and utilize base prompt template to
+generate the files and analyze the data to create the files using os in the application itself
