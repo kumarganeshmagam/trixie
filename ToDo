@@ -2,3 +2,5 @@
 2. Add the feature to make application give response without keywords
 3. Add feature to make the projects using user command / prompt and utilize base prompt template to
 generate the files and analyze the data to create the files using os in the application itself
+4. add feture" " remmember" if the key word is  remember then it should create a file along with the time stamp
+as filename and when user asked to retrieve it should show most recent 3 files and that data should be used when the model is answering any personal questions as a RAG component.
