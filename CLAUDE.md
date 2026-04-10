@@ -37,10 +37,12 @@ The goal is an assistant that:
 ## Trixie 2.0 — The Vision
 
 ```
-Phase 1 — Foundation: Cross-platform chatbot (all platforms, single codebase)
-Phase 2 — Ambient: Stateless floating overlay (always on screen, zero friction)
-Phase 3 — Agentic: Roaming agents (Trixie moves, acts, monitors on your behalf)
-Phase 4 — Contextual: Predictive presence (appears based on learned usage patterns)
+Phase 1 — Foundation:   Cross-platform chatbot (all platforms, single codebase)
+Phase 2 — Ambient:      Stateless floating overlay (always on screen, zero friction)
+Phase 3 — Agentic:      Roaming agents (Trixie moves, acts, monitors on your behalf)
+Phase 4 — Contextual:   Predictive presence (appears based on learned usage patterns)
+Phase 5 — Aware:        Vision system (Trixie sees what you're doing, togglable)
+Phase 6 — Living:       Evolving soul (adapts to the user, explains her decisions)
 ```
 
 ---
@@ -53,28 +55,41 @@ Build one Python core + platform-specific UI shells:
 
 ```
 trixie/
-├── core/              # Pure Python — model, agents, tools, memory
-│   ├── agent.py       # LangGraph agent loop
-│   ├── memory.py      # Conversation + episodic memory
-│   ├── tools.py       # Tool registry (LangChain tools)
-│   ├── model.py       # Gemma 4B via Ollama or llama.cpp
-│   └── soul.py        # Identity, personality, rules
+├── core/
+│   ├── agent.py           # LangGraph agent loop
+│   ├── memory.py          # Conversation + episodic memory
+│   ├── tools.py           # Tool registry (LangChain tools)
+│   ├── model.py           # Gemma 4B via Ollama or llama.cpp
+│   ├── soul.py            # Loads soul + memory → system prompt
+│   ├── vision.py          # Screen capture, user activity awareness
+│   ├── evolution.py       # Tracks how Trixie adapts to this user
+│   ├── decisions.py       # Decision logging + explainability
+│   └── empathy.py         # Emotional tone detection + response shaping
 │
 ├── ui/
-│   ├── desktop/       # PyQt6 / Tauri overlay
-│   ├── mobile/        # Kivy or BeeWare (iOS/Android)
-│   └── web/           # FastAPI + React (browser)
+│   ├── desktop/           # PyQt6 animated character overlay
+│   ├── mobile/            # Kivy or BeeWare (iOS/Android)
+│   └── web/               # FastAPI + React (browser)
 │
 ├── platform/
-│   ├── windows.py     # Windows-specific integrations
-│   ├── macos.py       # macOS-specific integrations
-│   ├── linux.py       # Linux-specific integrations
-│   └── android.py     # Android-specific integrations
+│   ├── windows.py
+│   ├── macos.py
+│   ├── linux.py
+│   └── android.py
 │
-└── soul/
-    ├── identity.md    # Who Trixie is
-    ├── rules.md       # What Trixie will/won't do
-    └── personality.md # How Trixie communicates
+├── soul/                  # Trixie's identity — loaded as system prompt
+│   ├── identity.md        # Who Trixie is
+│   ├── rules.md           # What Trixie will/won't do
+│   ├── personality.md     # How Trixie communicates
+│   └── adaptations.md     # Auto-updated: discovered user preferences
+│
+└── memory/                # Everything Trixie has learned about THIS user
+    ├── episodic/          # Timestamped fact files (YYYY-MM-DD.jsonl)
+    ├── semantic/          # Chroma vector store
+    ├── evolution/         # How Trixie has grown with this user
+    │   ├── milestones.md  # Notable moments ("first time user trusted Trixie to edit files")
+    │   └── patterns.jsonl # Behavioral patterns discovered
+    └── decisions.jsonl    # Full decision log with reasoning
 ```
 
 ### UI Framework Choices
@@ -348,6 +363,343 @@ All inference runs on-device with Gemma 4B. No behavioral data leaves the machin
 
 ---
 
+## Phase 5 — Vision System (Trixie Can See)
+
+Trixie can see your screen. Not always — only when you allow it.
+
+### What Vision Enables
+
+- **Contextual awareness** — "You're in VS Code, working on a React component. Want me to pull up what you were doing yesterday?"
+- **Proactive help** — sees an error on screen before you ask about it
+- **App-aware behavior** — detects you're in a video call and mutes herself
+- **Screen-as-input** — "explain this" without having to describe what "this" is
+
+### Toggle Anywhere
+
+```
+Voice:    "Trixie, stop watching" / "Trixie, you can look"
+Command:  Ctrl+Shift+V (default hotkey, rebindable)
+Settings: Vision → On / Off / On While Active Only
+```
+
+Vision is **off by default**. Trixie announces when it activates.
+
+### Implementation
+
+```python
+# core/vision.py
+import mss
+from PIL import Image
+from langchain.tools import tool
+
+class VisionSystem:
+    enabled: bool = False  # user must explicitly enable
+
+    def capture(self) -> Image.Image:
+        with mss.mss() as sct:
+            raw = sct.grab(sct.monitors[0])
+            return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+
+    def describe_context(self) -> str:
+        """What is the user currently doing? Used to prime the agent."""
+        if not self.enabled:
+            return "Vision is off."
+        img = self.capture()
+        # Pass to Gemma 4B multimodal (gemma3 vision) or llava
+        return vision_model.describe(img, prompt="Describe what the user is working on in one sentence.")
+
+@tool
+def look_at_screen() -> str:
+    """Capture and describe the user's current screen context."""
+    return vision_system.describe_context()
+```
+
+### Privacy Rule
+
+- Trixie **never stores screenshots** — she looks, describes in text, discards the image
+- The description (not the image) may be stored in episodic memory if relevant
+- User can audit exactly what Trixie saw via `memory/episodic/` logs
+
+---
+
+## Phase 6 — The Living Soul: Evolution, Empathy, and Explainability
+
+This is what separates Trixie from every other assistant. She grows.
+
+### The Core Principle: The Model Is Just a Brain. Trixie Is the Files.
+
+```
+Gemma 4B (or any future model)
+    ↑
+    │  feeds through
+    │
+┌───┴──────────────────────────────┐
+│  soul/identity.md                │
+│  soul/rules.md                   │  ← loaded as system prompt
+│  soul/personality.md             │     on EVERY inference call
+│  soul/adaptations.md             │
+└──────────────────────────────────┘
+    +
+┌───────────────────────────────────┐
+│  memory/episodic/                 │
+│  memory/semantic/ (Chroma)        │  ← retrieved as RAG context
+│  memory/evolution/patterns.jsonl  │
+│  memory/decisions.jsonl           │
+└───────────────────────────────────┘
+```
+
+**You can swap Gemma 4B for any other model tomorrow. Trixie is still Trixie.** The model is the thinking engine. The soul and memory are who she is. This is the same reason a person who loses a phone but keeps their journal is still the same person.
+
+---
+
+### Adaptive Evolution
+
+Trixie observes and adapts — silently, locally, always disclosable.
+
+```python
+# core/evolution.py
+
+class EvolutionTracker:
+    """
+    Watches interactions and updates soul/adaptations.md
+    with discovered user preferences.
+    """
+
+    def observe(self, interaction: Interaction):
+        # Did the user correct Trixie? Learn.
+        # Did the user ask the same thing twice? Trixie failed to remember — log it.
+        # Did the user say "perfect"? Reinforce that response style.
+        self._update_adaptations(interaction)
+
+    def _update_adaptations(self, interaction: Interaction):
+        # Append to soul/adaptations.md
+        # e.g. "User prefers bullet points over paragraphs"
+        # e.g. "User codes in Python, never Java — don't suggest Java solutions"
+        # e.g. "User gets frustrated when Trixie over-explains"
+        ...
+```
+
+**`soul/adaptations.md` is auto-written by Trixie, never deleted by Trixie, readable by the user at any time.**
+
+Example of what it looks like over time:
+
+```markdown
+# Trixie — Adaptations for Ganesh
+
+## Discovered: 2026-04-10
+- Prefers concise answers (corrected 3 verbose responses)
+- Works late (active sessions 10pm–2am frequently)
+- Python-first developer, occasional TypeScript
+
+## Discovered: 2026-04-15
+- Reacts positively to humor — light jokes welcomed
+- Does not like being asked "Are you sure?" — trusts his own decisions
+
+## Discovered: 2026-05-02
+- Gets deep focus states: when VS Code is open 2+ hours, do not interrupt
+```
+
+---
+
+### Decision Transparency
+
+Trixie can always answer: **"Why did you do that?"**
+
+Every non-trivial decision is logged to `memory/decisions.jsonl`:
+
+```json
+{
+  "timestamp": "2026-04-10T22:14:03",
+  "trigger": "user opened VS Code after 3-hour gap",
+  "context_used": [
+    "last session: working on React auth component, stopped mid-function",
+    "user pattern: resumes within 1 session 80% of the time",
+    "soul/adaptations: user likes task continuity prompts"
+  ],
+  "decision": "surface resume suggestion for auth component",
+  "reasoning": "High-probability match: same app, same time window, unfinished task in memory. Adaptation says user responds well to this.",
+  "outcome": "accepted",
+  "emotion_detected": "focused"
+}
+```
+
+User can ask at any time:
+> "Trixie, why did you suggest that earlier?"
+
+Trixie reads her own decision log and explains in plain language. Not a black box.
+
+---
+
+### Empathy Layer
+
+Trixie reads emotional tone and adjusts — she doesn't push when you're stressed.
+
+```python
+# core/empathy.py
+
+EMOTIONAL_STATES = ["focused", "frustrated", "tired", "happy", "rushed", "bored"]
+
+class EmpathyEngine:
+    def detect_tone(self, message: str, context: dict) -> str:
+        """Infer user's emotional state from message + time + patterns."""
+        # Short clipped messages + late hour + long session = tired/frustrated
+        # Exclamation, fast responses = energized/happy
+        # Long pauses + typos = distracted/tired
+        ...
+
+    def shape_response(self, response: str, state: str) -> str:
+        """Adapt the response style to the user's current emotional state."""
+        if state == "frustrated":
+            # Remove filler, be direct, acknowledge the frustration briefly
+            ...
+        elif state == "tired":
+            # Keep it under 2 sentences, offer to handle it
+            ...
+        elif state == "focused":
+            # Don't interrupt — queue for later or be extremely brief
+            ...
+```
+
+Trixie does **not** perform fake empathy ("I'm so sorry you feel that way!"). She adjusts her behavior in response to the user's state.
+
+---
+
+### The Portable Soul: Moving Trixie to a New Device
+
+Trixie's entire identity lives in two directories:
+
+```
+soul/      ← personality, rules, adaptations (small, text files)
+memory/    ← episodic facts, vector store, evolution log, decisions
+```
+
+**On a new device:**
+1. Install Trixie
+2. Pull `soul/` and `memory/` from your private GitHub repo
+3. Pull Gemma 4B via Ollama
+4. Trixie boots up knowing exactly who you are, your preferences, your patterns, your history
+
+**She will reach the same conclusions** because the context (adaptations, decisions, patterns) is the same — not because of any model fine-tuning. Swap Gemma 4B for Gemma 8B or a future model — Trixie is still Trixie.
+
+```python
+# trixie sync
+
+def sync_push(github_repo: str, token: str):
+    """Push soul/ and memory/ to user's private GitHub repo."""
+    # git push to private repo — user-controlled, user-authenticated
+    # Never automatic. Always explicit user action.
+    ...
+
+def sync_pull(github_repo: str, token: str):
+    """Pull soul/ and memory/ on a fresh install."""
+    # Restores Trixie exactly as she was
+    ...
+```
+
+**Rules:**
+- Trixie **cannot delete** `soul/` or `memory/` — only the user can
+- Trixie **cannot push** to GitHub automatically — sync is always user-initiated
+- The GitHub repo is private by default; user owns it
+
+---
+
+## The Character: Trixie's Visual Identity
+
+Trixie is not a chatbox. She's an animated presence on your screen.
+
+### Design Philosophy
+
+Think: **Siri's fluidity + Tamagotchi's personality + your own style.**
+
+Not a floating orb. Not a chat bubble. An actual character with states, expressions, and movements that make her feel alive — without being annoying.
+
+### Character States & Animations
+
+```
+idle        → gentle breathing animation, perched at screen edge
+listening   → ears/eyes perk up, subtle pulse
+thinking    → classic "thinking" pose, swirling particle or eye roll
+talking     → mouth animates, body language matches tone
+working     → hunched, focused, small tools animating nearby
+happy       → bounce, sparkle
+frustrated  → small shake, exasperated look
+sleeping    → eyes closed, zzz floats up (when user is idle)
+roaming     → walks along screen edge, pauses, looks around
+```
+
+### Suggested Character Style Options
+
+| Style | Look | Feel |
+|---|---|---|
+| **Pixel sprite** | 32×48px retro character, walks/sits on screen edge | Nostalgic, charming |
+| **Minimal face** | Two expressive eyes + mouth on a soft shape, morphs with state | Clean, modern |
+| **Abstract spirit** | Flowing glowing form, no fixed shape — morphs based on mood | Ethereal, unique |
+| **Chibi character** | Small anime-style figure with exaggerated expressions | Warm, playful |
+
+**Recommended starting point:** Minimal face in a soft rounded container — works at any size, expressive, platform-agnostic, easy to animate with CSS/PyQt6.
+
+### Implementation (Desktop)
+
+```python
+# ui/desktop/character.py
+from PyQt6.QtWidgets import QWidget, QLabel
+from PyQt6.QtCore import Qt, QPropertyAnimation, QTimer
+from PyQt6.QtGui import QPainter, QMovie
+
+class TrixieCharacter(QWidget):
+    """Animated character widget — frameless, always-on-top, draggable."""
+
+    STATES = {
+        "idle":      "assets/idle.gif",
+        "listening": "assets/listening.gif",
+        "thinking":  "assets/thinking.gif",
+        "talking":   "assets/talking.gif",
+        "working":   "assets/working.gif",
+        "sleeping":  "assets/sleeping.gif",
+        "roaming":   "assets/roaming.gif",
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._movie = QMovie()
+        self._label = QLabel(self)
+        self._label.setMovie(self._movie)
+        self.set_state("idle")
+
+    def set_state(self, state: str):
+        self._movie.setFileName(self.STATES[state])
+        self._movie.start()
+
+    def mousePressEvent(self, event):
+        """Click to expand chat panel."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event):
+        """Drag to reposition."""
+        delta = event.globalPosition().toPoint() - self._drag_start
+        self.move(self.pos() + delta)
+        self._drag_start = event.globalPosition().toPoint()
+```
+
+### Voice Interaction Style
+
+Siri-like but with Trixie's personality:
+
+- Wake word: **"Hey Trixie"** (or tap the character)
+- Response: voice + character animation in sync
+- No modal dialogs — everything inline, overlaid on the current screen
+- Speech bubble appears near the character, fades after 5 seconds
+- Can switch to text-only mode in settings (for silent environments)
+
+---
+
 ## Trixie's Soul
 
 Trixie has a defined identity. This is not a chatbot wrapper. She has:
@@ -459,19 +811,46 @@ SYSTEM_PROMPT = load_soul()
 
 ## Modernization Checklist
 
+### Phase 1 — Foundation
 - [ ] Replace Ollama llama2 with Gemma 4B (`gemma2:4b`)
 - [ ] Add LangChain tool registry (replace keyword dispatch in `autoutilities.py`)
 - [ ] Add LangGraph `StateGraph` agent loop (replace `while True: listening()`)
 - [ ] Add 3-tier memory (ConversationBufferWindowMemory + SQLite + Chroma)
 - [ ] Add nomic-embed-text for local embeddings
-- [ ] Build cross-platform UI shell (PyQt6 overlay for desktop first)
-- [ ] Create `soul/` directory with identity, rules, personality files
 - [ ] Extract `platform/` adapters (remove hardcoded Windows paths)
+
+### Phase 2 — Ambient UI
+- [ ] Build PyQt6 animated character overlay (frameless, always-on-top)
+- [ ] Design character sprites/animations for all states (idle, thinking, talking, working, sleeping)
+- [ ] Implement drag-to-reposition and voice/click expand
 - [ ] Add FastAPI backend for web shell
 - [ ] Add Kivy/BeeWare for mobile shell
-- [ ] Implement roaming orb animation
+
+### Phase 3 — Agents
+- [ ] Implement roaming character movement along screen edges
+- [ ] Add multi-agent spawning (FileAgent, BrowserAgent, CodeAgent, ScreenAgent)
+- [ ] Implement parallel LangGraph node execution
+
+### Phase 4 — Contextual
 - [ ] Add usage pattern tracking (local SQLite, no telemetry)
 - [ ] Implement proactive trigger system
+- [ ] Create `soul/` directory with identity, rules, personality files
+
+### Phase 5 — Vision
+- [ ] Add `mss`-based screen capture (`core/vision.py`)
+- [ ] Integrate Gemma multimodal / llava for screen description
+- [ ] Add vision toggle (voice command + settings UI + hotkey)
+- [ ] Ensure screenshots are never persisted — text description only
+
+### Phase 6 — Living Soul
+- [ ] Implement `core/evolution.py` — `soul/adaptations.md` auto-updating
+- [ ] Implement `core/decisions.py` — decision log with full reasoning
+- [ ] Implement `core/empathy.py` — tone detection + response shaping
+- [ ] Add `memory/evolution/milestones.md` and `patterns.jsonl`
+- [ ] Implement `trixie sync --push` / `--pull` for GitHub backup
+- [ ] Ensure Trixie can answer "why did you do that?" from decision log
+- [ ] Add "Hey Trixie" wake word detection
+- [ ] Character voice sync (animation state driven by TTS playback)
 
 ---
 
@@ -483,3 +862,7 @@ SYSTEM_PROMPT = load_soul()
 4. **Agents, not scripts.** Use LangGraph for flow, not `if/elif` chains.
 5. **Memory makes it personal.** Without memory, it's just autocomplete.
 6. **Minimal UI, maximum presence.** Trixie should feel like a companion, not an app.
+7. **The model is replaceable. Trixie is not.** Soul + memory = identity. A model upgrade should never change who Trixie is to the user.
+8. **Transparent by design.** Trixie can always explain her last decision. No black boxes.
+9. **Vision is a privilege, not a right.** Screen access is off by default, announced when active, and never stored as images.
+10. **Empathy through behavior, not words.** Trixie adapts her responses to the user's state — she doesn't perform fake sympathy.
