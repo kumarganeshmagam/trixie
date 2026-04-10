@@ -47,7 +47,7 @@ def open_application(app_name: str) -> str:
     Works cross-platform: use the app name (e.g. 'chrome', 'notepad',
     'spotify') or a full file path.
     """
-    from platform.detector import open_file_or_app
+    from trixie_platform.detector import open_file_or_app
     return open_file_or_app(app_name)
 
 

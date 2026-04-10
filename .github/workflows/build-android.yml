@@ -4,65 +4,127 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      # ── Python ────────────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ── System deps ───────────────────────────────────────────────────────────
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk \
-            libffi-dev libssl-dev zlib1g-dev \
+            git zip unzip wget \
+            openjdk-17-jdk \
+            libffi-dev libssl-dev zlib1g-dev libbz2-dev \
+            libreadline-dev libsqlite3-dev \
             autoconf automake libtool pkg-config \
-            cmake ninja-build
+            cmake ninja-build \
+            lld clang
 
-      - name: Cache Buildozer & Android SDK/NDK
+      # ── Cache: Android SDK / NDK / Buildozer deps ─────────────────────────────
+      - name: Cache Buildozer global state
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-            ~/.android
+          path: ~/.buildozer
           key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: buildozer-${{ runner.os }}-
+          restore-keys: |
+            buildozer-${{ runner.os }}-
 
+      - name: Cache Android SDK + NDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: android-sdk-${{ runner.os }}-ndk25c
+          restore-keys: android-sdk-${{ runner.os }}-
+
+      # ── Buildozer ─────────────────────────────────────────────────────────────
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
-          pip install buildozer cython==0.29.37
+          pip install buildozer==1.5.0 cython==0.29.37
 
-      - name: Accept Android SDK licences
+      # ── Write custom p4a recipe for llama-cpp-python ──────────────────────────
+      # This recipe compiles llama.cpp for arm64-v8a using the Android NDK.
+      - name: Create llama-cpp-python p4a recipe
         run: |
-          mkdir -p ~/.android
-          echo "count=0" > ~/.android/repositories.cfg
-          yes | buildozer android debug 2>&1 | head -5 || true
+          mkdir -p .p4a_recipes/llama_cpp_python
+          cat > .p4a_recipes/llama_cpp_python/__init__.py << 'RECIPE'
+          from pythonforandroid.recipe import PythonRecipe
+          from os.path import join
+
+          class LlamaCppPythonRecipe(PythonRecipe):
+              name = "llama_cpp_python"
+              version = "0.2.90"
+              url = "https://github.com/abetlen/llama-cpp-python/archive/refs/tags/v{version}.tar.gz"
+              depends = ["setuptools"]
+              patches = []
+
+              def get_recipe_env(self, arch):
+                  env = super().get_recipe_env(arch)
+                  ndk = self.ctx.ndk_dir
+                  env["CMAKE_ARGS"] = (
+                      "-DLLAMA_ANDROID=1 "
+                      "-DLLAMA_BUILD_TESTS=OFF "
+                      "-DLLAMA_BUILD_EXAMPLES=OFF "
+                      f"-DCMAKE_TOOLCHAIN_FILE={ndk}/build/cmake/android.toolchain.cmake "
+                      "-DANDROID_ABI=arm64-v8a "
+                      "-DANDROID_PLATFORM=android-26"
+                  )
+                  return env
+
+          recipe = LlamaCppPythonRecipe()
+          RECIPE
+
+      # ── Build debug APK ────────────────────────────────────────────────────────
+      - name: Accept Android SDK licenses
+        run: yes | buildozer android debug 2>&1 | head -20 || true
 
       - name: Build debug APK
-        run: buildozer -v android debug
+        run: buildozer -v android debug 2>&1
+        env:
+          ANDROIDAPI: "33"
+          ANDROIDMINAPI: "26"
 
-      - name: Upload APK artifact
+      # ── List output ───────────────────────────────────────────────────────────
+      - name: List APK output
+        run: ls -lh bin/ || echo "No APK found in bin/"
+
+      # ── Upload artifact ───────────────────────────────────────────────────────
+      - name: Upload debug APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: trixie-debug-apk
+          name: trixie-android-debug-${{ github.sha }}
           path: bin/*.apk
           retention-days: 30
 
-      # On tagged releases, create a GitHub release and attach the APK
+      # ── Release APK on version tags ───────────────────────────────────────────
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && success()
         uses: softprops/action-gh-release@v2
         with:
           files: bin/*.apk
           generate_release_notes: true
+          body: |
+            ## Install on Android
+
+            1. Download `trixie-*.apk` below
+            2. On your phone: Settings → Apps → Special permissions → Install unknown apps
+            3. Open the downloaded APK and install
+            4. Launch Trixie — it will download the Gemma 4B model (~2.7 GB) on first run
+
+            **Requires**: Android 8.0+, arm64, 6 GB RAM, 4 GB free storage
