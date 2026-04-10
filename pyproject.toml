@@ -1,0 +1,81 @@
+[tool.briefcase]
+project_name = "Trixie"
+bundle = "com.trixie"
+version = "2.0.0"
+url = "https://github.com/kumarganeshmagam/trixie"
+license = "MIT"
+author = "Ganesh Kumar"
+author_email = ""
+
+# ── Shared app config ─────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie]
+formal_name = "Trixie"
+description = "Your private AI assistant — on-device, no cloud"
+long_description = """
+Trixie is a personal AI assistant powered by Gemma 4B running entirely
+on your device. No API keys. No data sent to the cloud. Ever.
+"""
+icon = "assets/icon"
+sources = ["core", "setup", "platform", "soul", "memory", "ui"]
+main_module = "ui.mobile.app"
+
+requires = [
+    "kivy>=2.3.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "wikipedia>=1.4.0",
+    "Pillow>=10.2.0",
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langgraph>=0.1.0",
+    "chromadb>=0.5.0",
+    "llama-cpp-python>=0.2.0",
+]
+
+# ── Android ───────────────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie.android]
+requires = []
+
+# Permissions
+permission_INTERNET          = "Required for first-time Gemma 4B model download"
+permission_READ_EXTERNAL_STORAGE  = "Required for file access tools"
+permission_WRITE_EXTERNAL_STORAGE = "Required for saving Trixie's memory"
+permission_RECORD_AUDIO      = "Required for voice input"
+
+build_gradle_dependencies = [
+    "implementation 'androidx.appcompat:appcompat:1.6.1'",
+]
+
+# ── iOS ───────────────────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie.iOS]
+requires = []
+
+# Info.plist privacy strings (required by Apple)
+info = {
+    NSMicrophoneUsageDescription = "Trixie uses the microphone for voice input.",
+    NSPhotoLibraryUsageDescription = "Trixie can read images you share with it.",
+}
+
+# ── macOS (desktop) ───────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie.macOS]
+requires = [
+    "langchain-ollama>=0.1.0",
+]
+
+# ── Windows (desktop) ─────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie.windows]
+requires = [
+    "langchain-ollama>=0.1.0",
+]
+
+# ── Linux (desktop) ───────────────────────────────────────────────────────────
+
+[tool.briefcase.app.trixie.linux]
+requires = [
+    "langchain-ollama>=0.1.0",
+]
