@@ -60,34 +60,37 @@ jobs:
       # ── Write custom p4a recipe for llama-cpp-python ──────────────────────────
       # This recipe compiles llama.cpp for arm64-v8a using the Android NDK.
       - name: Create llama-cpp-python p4a recipe
+        shell: python
         run: |
-          mkdir -p .p4a_recipes/llama_cpp_python
-          cat > .p4a_recipes/llama_cpp_python/__init__.py << 'RECIPE'
-          from pythonforandroid.recipe import PythonRecipe
-          from os.path import join
-
-          class LlamaCppPythonRecipe(PythonRecipe):
-              name = "llama_cpp_python"
-              version = "0.2.90"
-              url = "https://github.com/abetlen/llama-cpp-python/archive/refs/tags/v{version}.tar.gz"
-              depends = ["setuptools"]
-              patches = []
-
-              def get_recipe_env(self, arch):
-                  env = super().get_recipe_env(arch)
-                  ndk = self.ctx.ndk_dir
-                  env["CMAKE_ARGS"] = (
-                      "-DLLAMA_ANDROID=1 "
-                      "-DLLAMA_BUILD_TESTS=OFF "
-                      "-DLLAMA_BUILD_EXAMPLES=OFF "
-                      f"-DCMAKE_TOOLCHAIN_FILE={ndk}/build/cmake/android.toolchain.cmake "
-                      "-DANDROID_ABI=arm64-v8a "
-                      "-DANDROID_PLATFORM=android-26"
-                  )
-                  return env
-
-          recipe = LlamaCppPythonRecipe()
-          RECIPE
+          import pathlib
+          recipe_dir = pathlib.Path(".p4a_recipes/llama_cpp_python")
+          recipe_dir.mkdir(parents=True, exist_ok=True)
+          (recipe_dir / "__init__.py").write_text(
+              "from pythonforandroid.recipe import PythonRecipe\n"
+              "from os.path import join\n"
+              "\n"
+              "class LlamaCppPythonRecipe(PythonRecipe):\n"
+              '    name = "llama_cpp_python"\n'
+              '    version = "0.2.90"\n'
+              '    url = "https://github.com/abetlen/llama-cpp-python/archive/refs/tags/v{version}.tar.gz"\n'
+              '    depends = ["setuptools"]\n'
+              "    patches = []\n"
+              "\n"
+              "    def get_recipe_env(self, arch):\n"
+              "        env = super().get_recipe_env(arch)\n"
+              "        ndk = self.ctx.ndk_dir\n"
+              '        env["CMAKE_ARGS"] = (\n'
+              '            "-DLLAMA_ANDROID=1 "\n'
+              '            "-DLLAMA_BUILD_TESTS=OFF "\n'
+              '            "-DLLAMA_BUILD_EXAMPLES=OFF "\n'
+              '            f"-DCMAKE_TOOLCHAIN_FILE={ndk}/build/cmake/android.toolchain.cmake "\n'
+              '            "-DANDROID_ABI=arm64-v8a "\n'
+              '            "-DANDROID_PLATFORM=android-26"\n'
+              "        )\n"
+              "        return env\n"
+              "\n"
+              "recipe = LlamaCppPythonRecipe()\n"
+          )
 
       # ── Build debug APK ────────────────────────────────────────────────────────
       - name: Accept Android SDK licenses
