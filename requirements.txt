@@ -29,8 +29,8 @@ Pillow>=10.2.0
 fastapi>=0.110.0
 uvicorn>=0.29.0
 
-# ── Desktop UI (PyQt6 overlay — Phase 2) ──────────────────────────────────────
-# PyQt6>=6.6.0          # uncomment when building the animated overlay
+# ── Desktop UI (PyQt6 animated overlay — `python main.py --overlay`) ──────────
+PyQt6>=6.6.0
 
 # ── Mobile (llama.cpp backend — for Android / iOS builds) ─────────────────────
 # llama-cpp-python>=0.2.0   # uncomment for mobile builds

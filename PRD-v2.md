@@ -658,15 +658,15 @@ uvicorn>=0.29.0
 | 1 | Evolution tracker (adaptations.md auto-update) | ✅ Built |
 | 1 | Decision logger (/why command) | ✅ Built |
 | 1 | GitHub Actions CI (Android + iOS + Desktop) | ✅ Built |
-| 2 | PyQt6 animated character overlay (desktop) | 🔲 Planned |
-| 2 | Character sprites/animations (idle/thinking/talking/etc.) | 🔲 Planned |
-| 2 | Drag-to-reposition, auto-collapse | 🔲 Planned |
-| 3 | Multi-agent spawning (FileAgent, BrowserAgent, CodeAgent) | 🔲 Planned |
-| 3 | Roaming character movement along screen edges | 🔲 Planned |
-| 4 | Usage pattern tracking (proactive triggers) | 🔲 Planned |
+| 2 | PyQt6 animated character overlay (desktop, `--overlay` flag) | ✅ Built |
+| 2 | Character animations (idle/listening/thinking/talking/working/sleeping/happy) — procedural QPainter, no sprite assets | ✅ Built |
+| 2 | Drag-to-reposition, click-to-expand chat panel, auto-sleep | ✅ Built |
+| 3 | Multi-agent orchestration (FileAgent, CodeAgent, ScreenAgent, MemoryAgent) — `core/agents.py` | ✅ Built |
+| 3 | Roaming character movement along screen edges | ✅ Built |
+| 4 | Usage pattern tracking + proactive triggers — `core/patterns.py`, `/patterns` command | ✅ Built |
 | 4 | App-context awareness (VS Code open → suggest last task) | 🔲 Planned |
+| 6 | Voice animation sync (talking state driven by TTS playback) | ✅ Built |
 | 6 | Wake word detection ("Hey Trixie") | 🔲 Planned |
-| 6 | Voice animation sync (character state driven by TTS) | 🔲 Planned |
 
 ---
 

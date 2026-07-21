@@ -112,6 +112,8 @@ class TrixieAgent:
     def __init__(self, llm) -> None:
         self._graph = build_graph(llm)
         self._working_memory = WorkingMemory()
+        self._llm = llm
+        self._orchestrator = None  # built lazily on first complex request
 
     def chat(self, user_input: str) -> str:
         """
@@ -125,6 +127,34 @@ class TrixieAgent:
         emotion_signal = detect_emotion(user_input)
         emotion = emotion_signal.state
         memory_context = retrieve_context(user_input)
+
+        # Usage-pattern tracking (Phase 4) — local only, best-effort
+        try:
+            from core.patterns import classify_topic, record_event
+            record_event("chat")
+            record_event("topic", classify_topic(user_input))
+        except Exception:
+            pass
+
+        # ── Multi-agent path (Phase 3) ────────────────────────────────────────
+        # Multi-step requests spanning several domains go to the orchestrator.
+        from core.agents import looks_complex
+        if looks_complex(user_input):
+            if self._orchestrator is None:
+                from core.agents import Orchestrator
+                self._orchestrator = Orchestrator(self._llm)
+            response_text = self._orchestrator.run(user_input)
+            self._working_memory.add("user", user_input)
+            self._working_memory.add("assistant", response_text)
+            observe(
+                Interaction(
+                    user_message=user_input,
+                    trixie_response=response_text,
+                    outcome="unknown",
+                    emotion=emotion,
+                )
+            )
+            return response_text
 
         # Rebuild message list from working memory
         history: list[BaseMessage] = []

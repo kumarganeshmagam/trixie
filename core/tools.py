@@ -15,7 +15,6 @@ import io
 import subprocess
 from pathlib import Path
 
-import wikipedia
 from langchain_core.tools import tool
 
 
@@ -24,6 +23,10 @@ from langchain_core.tools import tool
 @tool
 def search_wikipedia(query: str) -> str:
     """Search Wikipedia for factual information about a topic or concept."""
+    try:
+        import wikipedia
+    except ImportError:
+        return "Wikipedia search is unavailable (the 'wikipedia' package is not installed)."
     try:
         return wikipedia.summary(query, sentences=3)
     except wikipedia.DisambiguationError as e:

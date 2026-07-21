@@ -5,6 +5,7 @@ Detects the runtime environment and delegates to the right UI shell:
 
   Android / iOS  → Kivy mobile app  (ui/mobile/app.py)
   --web flag     → FastAPI web app  (ui/web/server.py)   opens in browser
+  --overlay flag → PyQt6 animated character overlay (ui/desktop/app.py)
   default        → CLI chat loop
 
 On first run (any platform): model download happens automatically.
@@ -38,24 +39,16 @@ elif "--web" in sys.argv:
     from ui.web.server import run as web_run
     web_run()
 
+# ── Overlay mode (PyQt6 animated character) ───────────────────────────────────
+elif "--overlay" in sys.argv:
+    from ui.desktop.app import run as overlay_run
+    overlay_run()
+
 # ── CLI (desktop default) ─────────────────────────────────────────────────────
 else:
     from datetime import datetime
 
-    _STATE_FILE = Path.home() / ".trixie" / ".setup_complete"
-
-    def _load_setup() -> dict | None:
-        if not _STATE_FILE.exists():
-            return None
-        try:
-            import ast
-            return ast.literal_eval(_STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return None
-
-    def _save_setup(result: dict) -> None:
-        _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _STATE_FILE.write_text(str(result), encoding="utf-8")
+    from setup.state import load_setup as _load_setup, save_setup as _save_setup
 
     def _make_speak():
         try:
@@ -93,6 +86,10 @@ else:
         if cmd == "/why":
             from core.decisions import explain_last_decision
             print(f"Trixie:\n{explain_last_decision()}\n")
+            return True
+        if cmd == "/patterns":
+            from core.patterns import export_patterns_summary
+            print(f"Trixie:\n{export_patterns_summary()}\n")
             return True
         if cmd.startswith("/vision"):
             from core.vision import vision
@@ -139,7 +136,7 @@ else:
         print(f"\nTrixie: {welcome}")
         speak(welcome)
         print()
-        print("  /reset  /memory  /why  /vision on|off  /sync push|pull <repo>  exit")
+        print("  /reset  /memory  /why  /patterns  /vision on|off  /sync push|pull <repo>  exit")
         print("─" * 56)
 
         while True:

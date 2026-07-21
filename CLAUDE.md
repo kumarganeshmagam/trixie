@@ -812,45 +812,45 @@ SYSTEM_PROMPT = load_soul()
 ## Modernization Checklist
 
 ### Phase 1 — Foundation
-- [ ] Replace Ollama llama2 with Gemma 4B (`gemma2:4b`)
-- [ ] Add LangChain tool registry (replace keyword dispatch in `autoutilities.py`)
-- [ ] Add LangGraph `StateGraph` agent loop (replace `while True: listening()`)
-- [ ] Add 3-tier memory (ConversationBufferWindowMemory + SQLite + Chroma)
-- [ ] Add nomic-embed-text for local embeddings
-- [ ] Extract `platform/` adapters (remove hardcoded Windows paths)
+- [x] Replace Ollama llama2 with Gemma 4B (`gemma2:4b`) — `core/model.py`
+- [x] Add LangChain tool registry (replace keyword dispatch in `autoutilities.py`) — `core/tools.py`
+- [x] Add LangGraph `StateGraph` agent loop (replace `while True: listening()`) — `core/agent.py`
+- [x] Add 3-tier memory (working window + SQLite + Chroma) — `core/memory.py`
+- [x] Add nomic-embed-text for local embeddings
+- [x] Extract platform adapters (remove hardcoded Windows paths) — `trixie_platform/detector.py`
 
 ### Phase 2 — Ambient UI
-- [ ] Build PyQt6 animated character overlay (frameless, always-on-top)
-- [ ] Design character sprites/animations for all states (idle, thinking, talking, working, sleeping)
-- [ ] Implement drag-to-reposition and voice/click expand
-- [ ] Add FastAPI backend for web shell
-- [ ] Add Kivy/BeeWare for mobile shell
+- [x] Build PyQt6 animated character overlay (frameless, always-on-top) — `ui/desktop/character.py`, launch with `--overlay`
+- [x] Design character animations for all states (idle, listening, thinking, talking, working, sleeping, happy) — procedurally drawn, no sprite assets needed
+- [x] Implement drag-to-reposition and click expand — `ui/desktop/app.py`
+- [x] Add FastAPI backend for web shell — `ui/web/server.py`
+- [x] Add Kivy/BeeWare for mobile shell — `ui/mobile/app.py`
 
 ### Phase 3 — Agents
-- [ ] Implement roaming character movement along screen edges
-- [ ] Add multi-agent spawning (FileAgent, BrowserAgent, CodeAgent, ScreenAgent)
-- [ ] Implement parallel LangGraph node execution
+- [x] Implement roaming character movement along screen edges — `TrixieCharacter._roam_step()`
+- [x] Add multi-agent spawning (FileAgent, CodeAgent, ScreenAgent, MemoryAgent) — `core/agents.py` orchestrator
+- [x] Implement LangGraph sub-agent execution (sequential with result threading; parallel is a future optimisation)
 
 ### Phase 4 — Contextual
-- [ ] Add usage pattern tracking (local SQLite, no telemetry)
-- [ ] Implement proactive trigger system
-- [ ] Create `soul/` directory with identity, rules, personality files
+- [x] Add usage pattern tracking (local SQLite, no telemetry) — `core/patterns.py`
+- [x] Implement proactive trigger system — `check_proactive_trigger()`, surfaced via overlay speech bubble + logged to decisions.jsonl
+- [x] Create `soul/` directory with identity, rules, personality files
 
 ### Phase 5 — Vision
-- [ ] Add `mss`-based screen capture (`core/vision.py`)
-- [ ] Integrate Gemma multimodal / llava for screen description
-- [ ] Add vision toggle (voice command + settings UI + hotkey)
-- [ ] Ensure screenshots are never persisted — text description only
+- [x] Add `mss`-based screen capture (`core/vision.py`)
+- [x] Integrate Gemma multimodal / llava for screen description
+- [x] Add vision toggle (`/vision` command + mobile settings + Ctrl+Shift+V in overlay)
+- [x] Ensure screenshots are never persisted — text description only
 
 ### Phase 6 — Living Soul
-- [ ] Implement `core/evolution.py` — `soul/adaptations.md` auto-updating
-- [ ] Implement `core/decisions.py` — decision log with full reasoning
-- [ ] Implement `core/empathy.py` — tone detection + response shaping
-- [ ] Add `memory/evolution/milestones.md` and `patterns.jsonl`
-- [ ] Implement `trixie sync --push` / `--pull` for GitHub backup
-- [ ] Ensure Trixie can answer "why did you do that?" from decision log
-- [ ] Add "Hey Trixie" wake word detection
-- [ ] Character voice sync (animation state driven by TTS playback)
+- [x] Implement `core/evolution.py` — `soul/adaptations.md` auto-updating
+- [x] Implement `core/decisions.py` — decision log with full reasoning
+- [x] Implement `core/empathy.py` — tone detection + response shaping
+- [x] Add `memory/evolution/milestones.md` and `patterns.jsonl`
+- [x] Implement `/sync push` / `/sync pull` for GitHub backup — `setup/sync.py`
+- [x] Ensure Trixie can answer "why did you do that?" from decision log — `/why`
+- [x] Character voice sync (talking animation driven by TTS playback in the overlay)
+- [ ] Add "Hey Trixie" wake word detection (remaining — needs local keyword-spotting model)
 
 ---
 

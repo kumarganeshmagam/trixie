@@ -20,6 +20,9 @@ build/
 .trixie/
 memory/episodic.db
 memory/semantic/
+memory/patterns.db
+memory/decisions.jsonl
+memory/evolution/patterns.jsonl
 *.gguf
 *.bin
 
