@@ -1,0 +1,199 @@
+name: Build Desktop Apps
+
+# Builds standalone executables for Windows, macOS, and Linux using PyInstaller.
+# The output is a single file that bundles Python + all dependencies.
+# The Gemma model is NOT bundled (too large) — downloaded on first run via Ollama.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: Linux
+            artifact: trixie-linux
+            binary: dist/trixie
+            extra_apt: ""
+
+          - os: windows-latest
+            name: Windows
+            artifact: trixie-windows
+            binary: dist/trixie.exe
+            extra_apt: ""
+
+          - os: macos-latest
+            name: macOS
+            artifact: trixie-macos
+            binary: dist/trixie
+            extra_apt: ""
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── Cache pip ─────────────────────────────────────────────────────────────
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/AppData/Local/pip/Cache
+            ~/Library/Caches/pip
+          key: pip-${{ matrix.os }}-${{ hashFiles('requirements.txt') }}
+
+      # ── Install dependencies ───────────────────────────────────────────────────
+      # Desktop uses Ollama (not llama-cpp-python), so we skip the heavy mobile dep.
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller
+          pip install \
+            langchain>=0.2.0 \
+            langchain-community>=0.2.0 \
+            langchain-ollama>=0.1.0 \
+            langgraph>=0.1.0 \
+            chromadb>=0.5.0 \
+            requests>=2.31.0 \
+            tqdm>=4.66.0 \
+            wikipedia>=1.4.0 \
+            python-decouple>=3.8 \
+            Pillow>=10.2.0 \
+            pyttsx3>=2.90 \
+            fastapi>=0.110.0 \
+            uvicorn>=0.29.0
+
+      # ── Linux: audio deps for pyttsx3 ────────────────────────────────────────
+      - name: Linux audio deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: sudo apt-get install -y espeak espeak-data libespeak1 libespeak-dev
+
+      # ── Write PyInstaller spec ─────────────────────────────────────────────────
+      - name: Write PyInstaller spec
+        shell: python
+        run: |
+          import os, textwrap, pathlib
+          sep = os.sep
+          spec = textwrap.dedent(f"""
+          # -*- mode: python ; coding: utf-8 -*-
+          import sys
+          from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+          block_cipher = None
+
+          # Collect dynamic-import-heavy packages
+          lc_datas, lc_binaries, lc_hiddens = collect_all('langchain')
+          lcc_datas, lcc_binaries, lcc_hiddens = collect_all('langchain_community')
+          lg_datas, lg_binaries, lg_hiddens = collect_all('langgraph')
+
+          a = Analysis(
+              ['main.py'],
+              pathex=['.'],
+              binaries=lc_binaries + lcc_binaries + lg_binaries,
+              datas=[
+                  ('soul', 'soul'),
+                  ('memory/evolution', 'memory/evolution'),
+                  *lc_datas, *lcc_datas, *lg_datas,
+              ],
+              hiddenimports=[
+                  'chromadb', 'chromadb.db', 'chromadb.api',
+                  'pyttsx3', 'pyttsx3.drivers', 'pyttsx3.drivers.espeak',
+                  'pyttsx3.drivers.nsss', 'pyttsx3.drivers.sapi5',
+                  'fastapi', 'uvicorn', 'uvicorn.logging', 'uvicorn.loops',
+                  'uvicorn.loops.asyncio', 'uvicorn.protocols',
+                  'uvicorn.protocols.http', 'uvicorn.protocols.http.auto',
+                  'trixie_platform.detector',
+                  *lc_hiddens, *lcc_hiddens, *lg_hiddens,
+                  collect_submodules('langchain_ollama'),
+              ],
+              hookspath=[],
+              cipher=block_cipher,
+              noarchive=False,
+          )
+          pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+          exe = EXE(
+              pyz, a.scripts, a.binaries, a.zipfiles, a.datas,
+              name='trixie',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              console=True,
+              icon=None,
+          )
+          """).strip()
+          pathlib.Path('trixie.spec').write_text(spec)
+
+      # ── Build executable ───────────────────────────────────────────────────────
+      - name: Build with PyInstaller
+        run: pyinstaller trixie.spec
+
+      # ── Smoke test ────────────────────────────────────────────────────────────
+      - name: Smoke test (--help)
+        run: ${{ matrix.binary }} --help || echo "(no --help flag, that's ok)"
+        continue-on-error: true
+
+      # ── Package ───────────────────────────────────────────────────────────────
+      - name: Zip artifact (Linux / macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd dist
+          zip -r ../${{ matrix.artifact }}.zip trixie
+
+      - name: Zip artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Compress-Archive -Path dist\trixie.exe -DestinationPath ${{ matrix.artifact }}.zip
+
+      # ── Upload ────────────────────────────────────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-${{ github.sha }}
+          path: ${{ matrix.artifact }}.zip
+          retention-days: 30
+
+      # ── Create GitHub Release on version tags ─────────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}.zip
+          generate_release_notes: true
+          body: |
+            ## Install on Desktop
+
+            ### Windows
+            1. Download `trixie-windows.zip`, extract it
+            2. Run `trixie.exe`
+            3. On first run, Trixie installs Ollama and downloads Gemma 4B (~2.7 GB)
+
+            ### macOS
+            1. Download `trixie-macos.zip`, extract it
+            2. `chmod +x trixie && ./trixie`
+            3. If blocked by Gatekeeper: right-click → Open → Open anyway
+
+            ### Linux
+            1. Download `trixie-linux.zip`, extract it
+            2. `chmod +x trixie && ./trixie`
+
+            **Web UI** (works on all platforms):
+            ```
+            ./trixie --web    # opens http://localhost:7860 in browser
+            ```

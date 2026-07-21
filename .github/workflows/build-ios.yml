@@ -1,0 +1,124 @@
+name: Build iOS IPA
+
+# GitHub's macos-latest runner has Xcode 15+ pre-installed.
+# You do NOT need a Mac locally — this workflow builds the IPA for you.
+#
+# Installing the IPA without an Apple Developer account:
+#   Option A (free, 7 days): AltStore  → https://altstore.io
+#   Option B (free, 7 days): Sideloadly → https://sideloadly.io
+#   Option C (paid, $99/yr): Apple Developer account → TestFlight / App Store
+#
+# To enable signed builds (TestFlight):
+#   Add these GitHub Secrets to your repo:
+#     APPLE_CERTIFICATE_BASE64   — base64-encoded .p12 cert
+#     APPLE_CERTIFICATE_PASSWORD — .p12 password
+#     APPLE_PROVISIONING_PROFILE — base64-encoded .mobileprovision
+#     APPLE_TEAM_ID              — your 10-char team ID
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── Xcode version ─────────────────────────────────────────────────────────
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # ── Install Briefcase ─────────────────────────────────────────────────────
+      - name: Install Briefcase
+        run: pip install briefcase==0.3.17
+
+      # ── Cache pip ─────────────────────────────────────────────────────────────
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: pip-ios-${{ hashFiles('requirements.txt') }}
+
+      # ── Install Python deps (for Briefcase to bundle) ─────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Optional: import code-signing certificate ─────────────────────────────
+      - name: Import signing certificate
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64:   ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          KEYCHAIN=build.keychain
+          security create-keychain -p "" $KEYCHAIN
+          security default-keychain -s $KEYCHAIN
+          security unlock-keychain -p "" $KEYCHAIN
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          security import certificate.p12 -k $KEYCHAIN -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" $KEYCHAIN
+          echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/trixie.mobileprovision
+
+      # ── Create iOS project ─────────────────────────────────────────────────────
+      - name: briefcase create iOS
+        run: briefcase create iOS --no-input
+
+      # ── Build IPA ─────────────────────────────────────────────────────────────
+      - name: briefcase build iOS
+        run: briefcase build iOS --no-input
+
+      # ── Locate IPA ────────────────────────────────────────────────────────────
+      - name: Find IPA file
+        run: find . -name "*.ipa" | head -5
+
+      # ── Upload IPA artifact ────────────────────────────────────────────────────
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: trixie-ios-${{ github.sha }}
+          path: |
+            **/*.ipa
+            iOS/*/dist/*.ipa
+          retention-days: 30
+
+      # ── Create GitHub Release on version tags ─────────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "**/*.ipa"
+          generate_release_notes: true
+          body: |
+            ## Install on iPhone (no Mac needed)
+
+            ### Option A — AltStore (free, renews every 7 days)
+            1. Install AltStore on your iPhone: https://altstore.io
+            2. Download `Trixie.ipa` from below
+            3. Open AltStore → My Apps → + → choose the IPA
+
+            ### Option B — Sideloadly (free, same 7-day limit)
+            1. Install Sideloadly: https://sideloadly.io
+            2. Connect iPhone to PC/Mac
+            3. Drag the IPA into Sideloadly, sign in with Apple ID, click Start
+
+            ### Option C — TestFlight (paid Apple Developer account)
+            Upload the IPA to App Store Connect → TestFlight.
+
+            **First launch**: Trixie downloads Gemma 4B (~2.7 GB) on Wi-Fi.
+            **Requires**: iOS 16+, 6 GB RAM, 4 GB free storage

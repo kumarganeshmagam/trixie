@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Trixie runtime (generated files — not source)
+.trixie/
+memory/episodic.db
+memory/semantic/
+memory/patterns.db
+memory/decisions.jsonl
+memory/evolution/patterns.jsonl
+*.gguf
+*.bin
+
+# Buildozer
+bin/
+.buildozer/
+.p4a_recipes/__pycache__/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

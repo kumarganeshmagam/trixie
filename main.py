@@ -1,102 +1,158 @@
-from datetime import datetime
-import os
-import pyttsx3 as p
-import speech_recognition as sr
-import pyaudio as pyadio
-from random import choice
-from utils import opening_text
-import autoutilities
-from decouple import config
+"""
+Trixie 2.0 — Unified entry point.
 
-USERNAME = config('USER')
-PANAME = config('PANAME')
+Detects the runtime environment and delegates to the right UI shell:
 
-engine = p.init()
-rate = engine.getProperty('rate')
-engine.setProperty('rate', 190)
-engine.setProperty('volume', 1.0)
-voices = engine.getProperty('voices')
-engine.setProperty('voice', voices[1].id)
-my_commands_list = {'open': autoutilities.open_app, 'search': autoutilities.search}
+  Android / iOS  → Kivy mobile app  (ui/mobile/app.py)
+  --web flag     → FastAPI web app  (ui/web/server.py)   opens in browser
+  --overlay flag → PyQt6 animated character overlay (ui/desktop/app.py)
+  default        → CLI chat loop
 
+On first run (any platform): model download happens automatically.
+"""
 
-def speak(value):
-    engine.say(value)
-    engine.runAndWait()
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 
-def greet_user():
-    hour = datetime.now().hour
-    if (hour >= 6) and (hour < 12):
-        speak(f"Good Morning {USERNAME}")
-    elif (hour >= 12) and (hour < 16):
-        speak(f"Good afternoon {USERNAME}")
-    elif (hour >= 16) and (hour < 19):
-        speak(f"Good Evening {USERNAME}")
-    speak(f"I am {PANAME}. How may I assist you?")
+def _is_mobile() -> bool:
+    import os
+    if os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA"):
+        return True
+    sdk = os.environ.get("SDK_NAME", "")
+    if "iphone" in sdk.lower() or os.environ.get("BRIEFCASE_PLATFORM") == "iOS":
+        return True
+    return False
 
 
-def screen_command(cd, tag):
-    index = cd.find(tag)
-    cmd = cd[index:]
-    cmd = cmd.replace(tag, '')
-    return cmd
+# ── Mobile (Kivy) ─────────────────────────────────────────────────────────────
+if _is_mobile():
+    from ui.mobile.app import run
+    run()
 
+# ── Web mode ──────────────────────────────────────────────────────────────────
+elif "--web" in sys.argv:
+    from ui.web.server import run as web_run
+    web_run()
 
-def action(command):
-    print("Action initiated...")
-    if "open" in command:
-        speak(autoutilities.open_app(screen_command(command, 'open ')))
-    elif 'image' in command:
-        speak(autoutilities.image(screen_command(command, '')))
-    elif 'search' in command:
-        speak(autoutilities.search(screen_command(command, 'search ')))
-    elif 'what is' in command or 'explain' in command:
-        speak(autoutilities.chat_llama(screen_command(command, '')))
-    elif 'write a' in command:
-        autoutilities.code_llama(screen_command(command, ''))
-        speak("Here is your code")
-    else:
-        speak("I didn't get you")
+# ── Overlay mode (PyQt6 animated character) ───────────────────────────────────
+elif "--overlay" in sys.argv:
+    from ui.desktop.app import run as overlay_run
+    overlay_run()
 
+# ── CLI (desktop default) ─────────────────────────────────────────────────────
+else:
+    from datetime import datetime
 
-def analyze(command):
-    print("Analyzing ...")
-    try:
-        if 'exit' in command or 'stop' in command:
-            hour = datetime.now().hour
-            if 21 <= hour < 6:
-                speak("Good night sir, take care!")
-            else:
-                speak('Have a good day sir!')
-            exit()
-        else:
-            speak(choice(opening_text))
-            action(command)
-    except Exception:
-        speak('Sorry, I could not understand. Could you please say that again?')
-        command = 'None'
+    from setup.state import load_setup as _load_setup, save_setup as _save_setup
 
-
-def listening():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        r.energy_threshold = 10000
-        r.adjust_for_ambient_noise(source, 1.2)
-        print('Listening....')
+    def _make_speak():
         try:
-            r.pause_threshold = 1
-            audio = r.listen(source)
-            text = r.recognize_google(audio, language='en-in')
-        except Exception as e:
-            print("Waiting....")
-            speak(' ')
-            return
-        print(text)
-        analyze(text)
+            import pyttsx3
+            engine = pyttsx3.init()
+            engine.setProperty("rate", 185)
+            engine.setProperty("volume", 1.0)
+            voices = engine.getProperty("voices")
+            if len(voices) > 1:
+                engine.setProperty("voice", voices[1].id)
+            def speak(text: str) -> None:
+                engine.say(text)
+                engine.runAndWait()
+            return speak
+        except Exception:
+            return lambda _: None
 
+    def _greeting() -> str:
+        h = datetime.now().hour
+        if 6 <= h < 12:  return "Good morning"
+        if 12 <= h < 17: return "Good afternoon"
+        if 17 <= h < 21: return "Good evening"
+        return "Hey"
 
-greet_user()
-while True:
-    listening()
-    print("Process terminated...")
+    def _handle_special(cmd: str, agent, speak) -> bool:
+        if cmd == "/reset":
+            agent.reset_working_memory()
+            print("Trixie: Working memory cleared.\n")
+            return True
+        if cmd == "/memory":
+            from core.memory import get_recent_episodic
+            facts = get_recent_episodic(10)
+            print("Trixie: " + ("\n".join(f"  {f}" for f in facts) if facts else "No memories yet.") + "\n")
+            return True
+        if cmd == "/why":
+            from core.decisions import explain_last_decision
+            print(f"Trixie:\n{explain_last_decision()}\n")
+            return True
+        if cmd == "/patterns":
+            from core.patterns import export_patterns_summary
+            print(f"Trixie:\n{export_patterns_summary()}\n")
+            return True
+        if cmd.startswith("/vision"):
+            from core.vision import vision
+            parts = cmd.split()
+            if len(parts) == 2 and parts[1] == "on":    msg = vision.enable()
+            elif len(parts) == 2 and parts[1] == "off": msg = vision.disable()
+            else: msg = f"Vision is {'ON' if vision.enabled else 'OFF'}. Use /vision on|off."
+            print(f"Trixie: {msg}\n"); speak(msg)
+            return True
+        if cmd.startswith("/sync"):
+            parts = cmd.split()
+            if len(parts) < 3:
+                print("Trixie: Usage: /sync push|pull <github-repo-url>\n")
+                return True
+            from setup.sync import sync_push, sync_pull
+            sync_push(parts[2]) if parts[1] == "push" else sync_pull(parts[2])
+            return True
+        return False
+
+    def main() -> None:
+        setup = _load_setup()
+        if setup is None:
+            print("=" * 56)
+            print("  Welcome to Trixie 2.0 — first-time setup")
+            print("=" * 56)
+            from setup.model_download import first_run_setup
+            setup = first_run_setup()
+            if not setup.get("ready"):
+                print("\n[error] Setup failed. See messages above.")
+                sys.exit(1)
+            _save_setup(setup)
+            print("\nSetup complete!\n")
+
+        from core.model import get_llm
+        print(f"[trixie] Loading model ({setup.get('backend', 'ollama')}) …")
+        llm = get_llm(backend=setup.get("backend", "ollama"),
+                      model_path=setup.get("model_path"))
+
+        from core.agent import TrixieAgent
+        agent = TrixieAgent(llm)
+        speak = _make_speak()
+
+        welcome = f"{_greeting()}! I'm Trixie. How can I help?"
+        print(f"\nTrixie: {welcome}")
+        speak(welcome)
+        print()
+        print("  /reset  /memory  /why  /patterns  /vision on|off  /sync push|pull <repo>  exit")
+        print("─" * 56)
+
+        while True:
+            try:
+                user_input = input("\nYou: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\nTrixie: Goodbye!"); break
+            if not user_input: continue
+            if user_input.lower() in ("exit", "quit", "bye"):
+                farewell = "Good night!" if datetime.now().hour < 6 else "Take care!"
+                print(f"\nTrixie: {farewell}"); speak(farewell); break
+            if user_input.startswith("/"):
+                _handle_special(user_input, agent, speak); continue
+            response = agent.chat(user_input)
+            print(f"\nTrixie: {response}")
+            speak(response)
+            print("─" * 56)
+
+    main()
